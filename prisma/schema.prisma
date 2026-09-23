@@ -1,0 +1,104 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth.js required models ────────────────────────────────────────────────
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          String    @default("admin")
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ─── Meeting Templates ───────────────────────────────────────────────────────
+model MeetingTemplate {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  icon        String   @default("video")
+  color       String   @default("blue")
+
+  // Meeting settings
+  duration          Int     @default(60)
+  timezone          String  @default("Asia/Jayapura")
+  passcode          String?
+  waitingRoom       Boolean @default(true)
+  requireAuth       Boolean @default(false)
+  hostVideo         Boolean @default(true)
+  participantVideo  Boolean @default(false)
+  muteUponEntry     Boolean @default(true)
+  autoRecording     String  @default("none")
+  agenda            String?
+
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Meeting Log / History Cache ─────────────────────────────────────────────
+model MeetingLog {
+  id          String   @id @default(cuid())
+  zoomMeetingId String @unique
+  topic       String
+  startTime   DateTime
+  duration    Int?
+  status      String   @default("ended")
+  participants Int?
+  joinUrl     String?
+  recordingUrl String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
