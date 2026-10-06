@@ -1,0 +1,75 @@
+0 verbose cli /Users/drew/.nvm/versions/node/v24.21.0/bin/node /Users/drew/.nvm/versions/node/v24.21.0/bin/npm
+1 info using npm@11.19.0
+2 info using node@v24.21.0
+3 silly config load:file:/Users/drew/.nvm/versions/node/v24.21.0/lib/node_modules/npm/npmrc
+4 silly config load:file:/Volumes/drew/Andrew/Code/zoom-sta/.npmrc
+5 silly config load:file:/Users/drew/.npmrc
+6 silly config load:file:/Users/drew/.nvm/versions/node/v24.21.0/etc/npmrc
+7 verbose title npm install prisma@6.4.1 @prisma/client@6.4.1
+8 verbose argv "--cache" "/Volumes/drew/Andrew/Code/zoom-sta/.npm-cache" "install" "prisma@6.4.1" "@prisma/client@6.4.1"
+9 verbose logfile logs-max:10 dir:/Volumes/drew/Andrew/Code/zoom-sta/.npm-cache/_logs/2026-10-05T04_15_09_757Z-
+10 verbose logfile /Volumes/drew/Andrew/Code/zoom-sta/.npm-cache/_logs/2026-10-05T04_15_09_757Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 http fetch GET 200 https://registry.npmjs.org/npm 1328ms
+14 silly idealTree buildDeps
+15 silly fetch manifest @prisma/client@6.4.1
+16 silly packumentCache full:https://registry.npmjs.org/@prisma%2fclient cache-miss
+17 http fetch GET 200 https://registry.npmjs.org/@prisma%2fclient 1900ms (cache miss)
+18 silly packumentCache full:https://registry.npmjs.org/@prisma%2fclient set size:undefined disposed:false
+19 silly fetch manifest prisma@6.4.1
+20 silly packumentCache full:https://registry.npmjs.org/prisma cache-miss
+21 http fetch GET 200 https://registry.npmjs.org/prisma 1045ms (cache miss)
+22 silly packumentCache full:https://registry.npmjs.org/prisma set size:undefined disposed:false
+23 silly fetch manifest typescript@^5
+24 silly packumentCache full:https://registry.npmjs.org/typescript cache-miss
+25 http fetch GET 200 https://registry.npmjs.org/typescript 478ms (cache miss)
+26 silly packumentCache full:https://registry.npmjs.org/typescript set size:undefined disposed:false
+27 silly placeDep ROOT @prisma/client@6.4.1 REPLACE for: zoom-sta@0.1.0 want: 6.4.1
+28 silly placeDep ROOT prisma@6.4.1 REPLACE for: zoom-sta@0.1.0 want: 6.4.1
+29 silly fetch manifest esbuild@>=0.12 <1
+30 silly packumentCache full:https://registry.npmjs.org/esbuild cache-miss
+31 silly fetch manifest @prisma/engines@6.4.1
+32 silly packumentCache full:https://registry.npmjs.org/@prisma%2fengines cache-miss
+33 silly fetch manifest esbuild-register@3.6.0
+34 silly packumentCache full:https://registry.npmjs.org/esbuild-register cache-miss
+35 silly fetch manifest fsevents@2.3.3
+36 silly packumentCache full:https://registry.npmjs.org/fsevents cache-miss
+37 http fetch GET 200 https://registry.npmjs.org/esbuild 173ms (cache miss)
+38 silly packumentCache full:https://registry.npmjs.org/esbuild set size:undefined disposed:false
+39 http fetch GET 200 https://registry.npmjs.org/esbuild-register 1670ms (cache miss)
+40 silly packumentCache full:https://registry.npmjs.org/esbuild-register set size:undefined disposed:false
+41 http fetch GET 200 https://registry.npmjs.org/fsevents 1698ms (cache miss)
+42 silly packumentCache full:https://registry.npmjs.org/fsevents set size:undefined disposed:false
+43 http fetch GET 200 https://registry.npmjs.org/@prisma%2fengines 2306ms (cache miss)
+44 silly packumentCache full:https://registry.npmjs.org/@prisma%2fengines set size:undefined disposed:false
+45 silly placeDep ROOT @prisma/engines@6.4.1 OK for: prisma@6.4.1 want: 6.4.1
+46 silly placeDep ROOT esbuild@0.28.2 OK for: prisma@6.4.1 want: >=0.12 <1
+47 verbose stack TypeError: Cannot read properties of null (reading 'matches')
+47 verbose stack     at Link.matches (/Users/drew/.nvm/versions/node/v24.21.0/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/node.js:1184:41)
+47 verbose stack     at Link.canDedupe (/Users/drew/.nvm/versions/node/v24.21.0/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/node.js:1128:15)
+47 verbose stack     at PlaceDep.pruneDedupable (/Users/drew/.nvm/versions/node/v24.21.0/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/place-dep.js:427:14)
+47 verbose stack     at new PlaceDep (/Users/drew/.nvm/versions/node/v24.21.0/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/place-dep.js:279:14)
+47 verbose stack     at #buildDepStep (/Users/drew/.nvm/versions/node/v24.21.0/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/build-ideal-tree.js:1016:18)
+47 verbose stack     at async Arborist.buildIdealTree (/Users/drew/.nvm/versions/node/v24.21.0/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/build-ideal-tree.js:180:7)
+47 verbose stack     at async Promise.all (index 1)
+47 verbose stack     at async Arborist.reify (/Users/drew/.nvm/versions/node/v24.21.0/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/reify.js:118:5)
+47 verbose stack     at async Install.exec (/Users/drew/.nvm/versions/node/v24.21.0/lib/node_modules/npm/lib/commands/install.js:158:5)
+47 verbose stack     at async Npm.exec (/Users/drew/.nvm/versions/node/v24.21.0/lib/node_modules/npm/lib/npm.js:193:9)
+48 error Cannot read properties of null (reading 'matches')
+49 silly unfinished npm timer reify 1791173710772
+50 silly unfinished npm timer reify:loadTrees 1791173710773
+51 silly unfinished npm timer idealTree:buildDeps 1791173717108
+52 silly unfinished npm timer idealTree:node_modules/prisma 1791173724502
+53 verbose cwd /Volumes/drew/Andrew/Code/zoom-sta
+54 verbose os Darwin 24.6.0
+55 verbose node v24.21.0
+56 verbose npm  v11.19.0
+57 notice
+57 notice New [31mmajor[39m version of npm available! [31m11.19.0[39m -> [34m12.2.0[39m
+57 notice Changelog: [34mhttps://github.com/npm/cli/releases/tag/v12.2.0[39m
+57 notice To update run: [4mnpm install -g npm@12.2.0[24m
+57 notice  { force: true, Symbol(proc-log.meta): true }
+58 verbose exit 1
+59 verbose code 1
+60 error A complete log of this run can be found in: /Volumes/drew/Andrew/Code/zoom-sta/.npm-cache/_logs/2026-10-05T04_15_09_757Z-debug-0.log

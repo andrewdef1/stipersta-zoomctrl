@@ -74,25 +74,27 @@ export function buildInvitationText(meeting: {
   password?: string;
   join_url: string;
 }): string {
-  const startDate = formatDateTime(meeting.start_time);
-  const duration = formatDuration(meeting.duration);
+  const d = new Date(meeting.start_time);
+  const dateStr = format(d, "EEEE, d MMMM yyyy", { locale: localeId });
+  const timeStr = format(d, "HH:mm") + " WIT";
 
-  return `*Undangan Rapat Zoom*
-━━━━━━━━━━━━━━━━━━━━━━
-📋 *Topik:* ${meeting.topic}
-📅 *Waktu:* ${startDate} WIT
-⏱️ *Durasi:* ${duration}
-━━━━━━━━━━━━━━━━━━━━━━
-🔗 *Link Bergabung:*
+  return `STIPER Santo Thomas Aquinas Jayapura
+
+Anda diundang untuk mengikuti Zoom Meeting.
+
+Topic: ${meeting.topic}
+
+Date: ${dateStr}
+Time: ${timeStr}
+
+Join Zoom Meeting:
 ${meeting.join_url}
 
-📌 *Meeting ID:* ${meeting.id}
-${meeting.password ? `🔑 *Passcode:* ${meeting.password}` : ""}
-━━━━━━━━━━━━━━━━━━━━━━
-Harap bergabung 5 menit sebelum acara dimulai.
+Meeting ID: ${meeting.id}
+${meeting.password ? `Passcode: ${meeting.password}` : ""}
 
 Salam,
-*STIPER STA*`;
+Admin ZOOM-STA (STIPER STA Jayapura)`;
 }
 
 /** Truncate long text with ellipsis */

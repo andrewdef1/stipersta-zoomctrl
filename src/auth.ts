@@ -1,7 +1,5 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
 const credentialsSchema = z.object({
@@ -10,8 +8,9 @@ const credentialsSchema = z.object({
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  adapter: PrismaAdapter(prisma),
+  secret: process.env.AUTH_SECRET,
   session: { strategy: "jwt" },
+  trustHost: true,
   pages: {
     signIn: "/login",
   },
@@ -35,11 +34,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        // Return a virtual user object
         return {
           id: "admin-1",
-          name: "Administrator",
-          email: process.env.ZOOM_HOST_EMAIL ?? "admin@zoomsta.local",
+          name: "Administrator STIPER STA",
+          email: process.env.ZOOM_HOST_EMAIL ?? "stipersta@gmail.com",
         };
       },
     }),

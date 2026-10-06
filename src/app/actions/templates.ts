@@ -1,10 +1,9 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
+import { prisma, type MeetingTemplate } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import type { ActionResult } from "@/types/zoom";
-import type { MeetingTemplate } from "@prisma/client";
 
 async function requireAuth() {
   const session = await auth();

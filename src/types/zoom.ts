@@ -31,6 +31,16 @@ export interface ZoomMeetingSettings {
   password?: string;
   meeting_authentication?: boolean;
   authentication_option?: string;
+  registrants_email_notification?: boolean;
+}
+
+export interface ZoomRecurrence {
+  type: 1 | 2 | 3; // 1 = daily, 2 = weekly, 3 = monthly
+  repeat_interval: number;
+  weekly_days?: string; // 1 = Sunday, 2 = Monday, ...
+  monthly_day?: number;
+  end_times?: number;
+  end_date_time?: string;
 }
 
 export interface ZoomMeeting {
@@ -50,6 +60,7 @@ export interface ZoomMeeting {
   join_url: string;
   password?: string;
   settings?: ZoomMeetingSettings;
+  recurrence?: ZoomRecurrence;
 }
 
 export interface ZoomListResponse<T> {
@@ -60,6 +71,9 @@ export interface ZoomListResponse<T> {
   next_page_token?: string;
   meetings?: T[];
   participants?: T[];
+  users?: T[];
+  recordings?: T[];
+  webinars?: T[];
 }
 
 export interface CreateMeetingRequest {
@@ -71,6 +85,7 @@ export interface CreateMeetingRequest {
   agenda?: string;
   password?: string;
   settings?: ZoomMeetingSettings;
+  recurrence?: ZoomRecurrence;
 }
 
 export interface UpdateMeetingRequest {
@@ -82,6 +97,7 @@ export interface UpdateMeetingRequest {
   agenda?: string;
   password?: string;
   settings?: ZoomMeetingSettings;
+  recurrence?: ZoomRecurrence;
 }
 
 export interface ZoomUser {
@@ -89,14 +105,25 @@ export interface ZoomUser {
   first_name: string;
   last_name: string;
   email: string;
-  type: number;
+  type: number; // 1 = Basic, 2 = Licensed, 3 = On-prem
+  role_name?: string;
   status: string;
   pmi: number;
   timezone: string;
   verified: number;
-  dept: string;
+  dept?: string;
   created_at: string;
-  last_login_time: string;
+  last_login_time?: string;
+  pic_url?: string;
+}
+
+export interface ZoomAccountInfo {
+  id: string;
+  account_name: string;
+  account_number: number;
+  account_type?: string;
+  seats: number;
+  created_at?: string;
 }
 
 export interface ZoomPastMeeting {
@@ -126,6 +153,59 @@ export interface ZoomPastMeetingParticipant {
   attentiveness_score?: string;
 }
 
+export interface ZoomRecordingFile {
+  id: string;
+  meeting_id: string;
+  recording_start: string;
+  recording_end: string;
+  file_type: "MP4" | "M4A" | "CHAT" | "TRANSCRIPT" | "TIMELINE" | string;
+  file_extension: string;
+  file_size: number;
+  play_url?: string;
+  download_url?: string;
+  status: string;
+  recording_type: string;
+}
+
+export interface ZoomMeetingRecording {
+  uuid: string;
+  id: number;
+  account_id: string;
+  host_id: string;
+  topic: string;
+  start_time: string;
+  duration: number;
+  total_size: number;
+  recording_count: number;
+  share_url?: string;
+  recording_files: ZoomRecordingFile[];
+}
+
+export interface ZoomWebinar {
+  id: number;
+  uuid: string;
+  host_id: string;
+  topic: string;
+  type: number; // 5 = webinar, 6 = recurring no fixed time, 9 = recurring fixed time
+  start_time: string;
+  duration: number;
+  timezone: string;
+  agenda?: string;
+  created_at: string;
+  join_url: string;
+  settings?: Record<string, any>;
+}
+
+export interface ZoomDailyUsageReport {
+  dates?: Array<{
+    date: string;
+    new_users: number;
+    meetings: number;
+    participants: number;
+    meeting_minutes: number;
+  }>;
+}
+
 export interface ZoomApiError {
   code: number;
   message: string;
@@ -146,10 +226,23 @@ export interface MeetingFormData {
   participant_video: boolean;
   mute_upon_entry: boolean;
   auto_recording: ZoomAutoRecording;
+  recurrence_type?: "none" | "daily" | "weekly" | "monthly";
 }
 
 export interface MeetingWithStatus extends ZoomMeeting {
   computed_status: "upcoming" | "live" | "finished";
+}
+
+export interface AttendanceRecord {
+  id: string;
+  name: string;
+  email: string | null;
+  joinTime: string;
+  leaveTime: string | null;
+  duration: number;
+  status: "Present" | "Late" | "Left Early" | "Absent";
+  meetingTopic: string;
+  zoomMeetingId: string;
 }
 
 export type ActionResult<T = void> =
