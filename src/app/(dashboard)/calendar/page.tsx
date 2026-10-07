@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getUpcomingMeetingsAction } from "@/app/actions/zoom";
+import { getAllMeetingsAction } from "@/app/actions/zoom";
 import { CalendarView } from "@/components/calendar/CalendarView";
 import { Calendar } from "lucide-react";
 
@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function CalendarPage() {
-  const result = await getUpcomingMeetingsAction();
+  const result = await getAllMeetingsAction();
   const meetings = result.success ? result.data : [];
 
   return (

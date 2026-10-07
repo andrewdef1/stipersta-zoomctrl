@@ -42,12 +42,32 @@ export function TodayMeetingList({ meetings, className }: TodayMeetingListProps)
       </div>
 
       <div className="space-y-2">
-        {meetings.map((meeting) => {
+        {[...meetings]
+          .sort((a, b) => {
+            const statusA = getMeetingStatus(a.start_time, a.duration);
+            const statusB = getMeetingStatus(b.start_time, b.duration);
+            const timeA = new Date(a.start_time).getTime();
+            const timeB = new Date(b.start_time).getTime();
+
+            const priority = (s: "live" | "upcoming" | "finished") => {
+              if (s === "live") return 0;
+              if (s === "upcoming") return 1;
+              return 2;
+            };
+
+            const pA = priority(statusA);
+            const pB = priority(statusB);
+
+            if (pA !== pB) return pA - pB;
+            if (statusA === "upcoming" || statusA === "live") return timeA - timeB;
+            return timeB - timeA;
+          })
+          .map((meeting, idx) => {
           const status = getMeetingStatus(meeting.start_time, meeting.duration);
           const isLive = status === "live";
           return (
             <Link
-              key={meeting.id}
+              key={`${meeting.uuid || meeting.id}_${meeting.start_time || idx}`}
               href={`/meetings/${meeting.id}`}
               className="group flex items-center gap-3 rounded-xl p-3 hover:bg-white/5 transition-colors"
             >

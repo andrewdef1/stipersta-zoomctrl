@@ -190,9 +190,9 @@ export function CalendarView({ meetings }: CalendarViewProps) {
                     </div>
 
                     <div className="space-y-1 overflow-y-auto max-h-[80px]">
-                      {dayMeetings.map((m) => (
+                      {dayMeetings.map((m, idx) => (
                         <Link
-                          key={m.id}
+                          key={`${m.uuid || m.id}_${m.start_time || idx}`}
                           href={`/meetings/${m.id}`}
                           className="block rounded-lg bg-blue-500/15 border border-blue-500/20 px-2 py-1 text-[11px] text-blue-300 hover:bg-blue-500/25 transition-colors truncate"
                           title={`${m.topic} (${formatTime(m.start_time)})`}
@@ -219,9 +219,9 @@ export function CalendarView({ meetings }: CalendarViewProps) {
               Tidak ada jadwal rapat untuk periode ini.
             </div>
           ) : (
-            meetings.map((m) => (
+            meetings.map((m, idx) => (
               <div
-                key={m.id}
+                key={`${m.uuid || m.id}_${m.start_time || idx}`}
                 className="flex items-center justify-between rounded-xl bg-white/[0.02] border border-white/5 p-4 hover:border-white/10 transition-all"
               >
                 <div className="flex items-center gap-3">

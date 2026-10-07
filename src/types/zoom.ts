@@ -32,6 +32,8 @@ export interface ZoomMeetingSettings {
   meeting_authentication?: boolean;
   authentication_option?: string;
   registrants_email_notification?: boolean;
+  alternative_hosts?: string;
+  alternative_hosts_email_notification?: boolean;
 }
 
 export interface ZoomRecurrence {

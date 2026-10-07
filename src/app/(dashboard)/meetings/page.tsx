@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getScheduledMeetingsAction } from "@/app/actions/zoom";
+import { getAllMeetingsAction } from "@/app/actions/zoom";
 import { MeetingTable } from "@/components/meetings/MeetingTable";
 import { NewMeetingButton } from "@/components/meetings/NewMeetingButton";
 import { CalendarDays, AlertCircle } from "lucide-react";
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function MeetingsPage() {
-  const result = await getScheduledMeetingsAction();
+  const result = await getAllMeetingsAction();
 
   return (
     <div className="space-y-6">

@@ -63,9 +63,9 @@ export function RecordingsList({ recordings }: Props) {
 
   return (
     <div className="space-y-4">
-      {recordings.map((rec) => (
+      {recordings.map((rec, idx) => (
         <div
-          key={rec.id}
+          key={`${rec.uuid || rec.id}_${rec.start_time || idx}`}
           className="rounded-2xl glass p-5 border border-white/5 space-y-4 hover:border-white/10 transition-all"
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/5 pb-4">

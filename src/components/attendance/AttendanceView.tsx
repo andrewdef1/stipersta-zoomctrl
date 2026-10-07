@@ -180,8 +180,8 @@ export function AttendanceView({ initialData }: Props) {
                   </td>
                 </tr>
               ) : (
-                filtered.map((r) => (
-                  <tr key={r.id} className="hover:bg-white/[0.02] transition-colors">
+                filtered.map((r, idx) => (
+                  <tr key={`${r.id}_${idx}`} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-5 py-3.5 font-medium text-white">{r.name}</td>
                     <td className="px-5 py-3.5 text-zinc-400">{r.email || "-"}</td>
                     <td className="px-5 py-3.5 text-blue-400 font-medium">{r.meetingTopic}</td>

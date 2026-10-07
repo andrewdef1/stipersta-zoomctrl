@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getMeetingAction } from "@/app/actions/zoom";
+import {
+  getMeetingAction,
+  getMeetingParticipantsWithCoHostAction,
+  getUsersAction,
+} from "@/app/actions/zoom";
 import { getMeetingStatus, formatDateTime, formatDuration } from "@/lib/utils";
 import { MeetingStatusBadge } from "@/components/meetings/MeetingStatusBadge";
 import { InvitationDialog } from "@/components/meetings/InvitationDialog";
 import { DeleteConfirmDialog } from "@/components/meetings/DeleteConfirmDialog";
 import { EditMeetingButton } from "@/components/meetings/EditMeetingButton";
+import { MeetingParticipantManager } from "@/components/meetings/MeetingParticipantManager";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -72,7 +77,11 @@ async function CopyableLink({ url, label }: { url: string; label: string }) {
 
 export default async function MeetingDetailPage({ params }: Props) {
   const { meetingId } = await params;
-  const result = await getMeetingAction(meetingId);
+  const [result, participantsResult, usersResult] = await Promise.all([
+    getMeetingAction(meetingId),
+    getMeetingParticipantsWithCoHostAction(meetingId),
+    getUsersAction(),
+  ]);
 
   if (!result.success || !result.data) {
     notFound();
@@ -81,6 +90,16 @@ export default async function MeetingDetailPage({ params }: Props) {
   const meeting = result.data;
   const status = getMeetingStatus(meeting.start_time, meeting.duration);
   const isLive = status === "live";
+  const orgUsers = usersResult.success ? usersResult.data : [];
+  const initialParticipants = participantsResult.success
+    ? participantsResult.data.participants
+    : [];
+  const initialCoHosts = participantsResult.success
+    ? participantsResult.data.coHosts
+    : (meeting.settings?.alternative_hosts || "")
+        .split(/[,;]/)
+        .map((e) => e.trim().toLowerCase())
+        .filter(Boolean);
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -214,7 +233,7 @@ export default async function MeetingDetailPage({ params }: Props) {
         {meeting.settings && (
           <div className="rounded-2xl glass p-5 md:col-span-2">
             <h2 className="text-sm font-semibold text-white mb-3">
-              Pengaturan
+              Pengaturan Rapat
             </h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {[
@@ -274,6 +293,15 @@ export default async function MeetingDetailPage({ params }: Props) {
           </div>
         )}
       </div>
+
+      {/* Participants & Co-Host Manager */}
+      <MeetingParticipantManager
+        meetingId={meeting.id}
+        initialParticipants={initialParticipants}
+        initialCoHosts={initialCoHosts}
+        hostEmail={meeting.host_email || "stipersta@gmail.com"}
+        orgUsers={orgUsers}
+      />
     </div>
   );
 }

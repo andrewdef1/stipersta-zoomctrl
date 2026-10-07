@@ -323,6 +323,73 @@ export const db = {
     return Number(res?.count || 0);
   },
 
+  // Meetings
+  saveMeetings: async (meetings: Array<{
+    id: string | number;
+    zoomMeetingId?: string | number;
+    uuid?: string;
+    topic: string;
+    startTime: string;
+    duration?: number;
+    timezone?: string;
+    status?: string;
+    hostEmail?: string;
+    joinUrl?: string;
+    startUrl?: string;
+    passcode?: string;
+  }>) => {
+    const dbInst = getDatabase();
+    const stmt = dbInst.prepare(`
+      INSERT OR REPLACE INTO meetings (
+        id, zoom_meeting_id, uuid, topic, start_time, duration,
+        timezone, status, host_email, join_url, start_url, passcode, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `);
+    for (const m of meetings) {
+      const zoomId = String(m.zoomMeetingId || m.id);
+      const meetingId = String(m.id || zoomId);
+      stmt.run(
+        meetingId,
+        zoomId,
+        m.uuid || null,
+        m.topic,
+        m.startTime,
+        m.duration || 60,
+        m.timezone || "Asia/Jayapura",
+        m.status || "scheduled",
+        m.hostEmail || "stipersta@gmail.com",
+        m.joinUrl || null,
+        m.startUrl || null,
+        m.passcode || null
+      );
+    }
+  },
+
+  getSavedMeetings: async () => {
+    const dbInst = getDatabase();
+    const rows = dbInst.prepare(`
+      SELECT id, zoom_meeting_id as zoomMeetingId, uuid, topic, start_time as startTime,
+             duration, timezone, status, host_email as hostEmail, join_url as joinUrl,
+             start_url as startUrl, passcode, created_at as createdAt, updated_at as updatedAt
+      FROM meetings
+      ORDER BY start_time DESC
+      LIMIT 500
+    `).all() as any[];
+    return rows.map((r) => ({
+      id: Number(r.zoomMeetingId) || r.id,
+      uuid: r.uuid,
+      topic: r.topic,
+      type: 2 as const,
+      start_time: r.startTime,
+      duration: r.duration || 60,
+      timezone: r.timezone || "Asia/Jayapura",
+      join_url: r.joinUrl || `https://zoom.us/j/${r.zoomMeetingId}`,
+      start_url: r.startUrl,
+      password: r.passcode,
+      status: r.status,
+    }));
+  },
+
   // Participants & Attendance
   saveParticipants: async (zoomMeetingId: string, participants: Array<{
     name: string;

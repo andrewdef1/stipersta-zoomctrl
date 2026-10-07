@@ -171,10 +171,137 @@ export async function listUsers(): Promise<ZoomUser[]> {
 export async function listMeetings(
   type: "scheduled" | "live" | "upcoming" | "previous_meetings" = "upcoming"
 ): Promise<ZoomMeeting[]> {
-  const data = await zoomFetch<ZoomListResponse<ZoomMeeting>>(
-    `/users/${encodeURIComponent(ZOOM_HOST_EMAIL)}/meetings?type=${type}&page_size=100`
+  let allMeetings: ZoomMeeting[] = [];
+  let nextPageToken = "";
+
+  do {
+    const tokenQuery = nextPageToken
+      ? `&next_page_token=${encodeURIComponent(nextPageToken)}`
+      : "";
+    const data = await zoomFetch<ZoomListResponse<ZoomMeeting>>(
+      `/users/${encodeURIComponent(ZOOM_HOST_EMAIL)}/meetings?type=${type}&page_size=300${tokenQuery}`
+    );
+
+    if (data.meetings && data.meetings.length > 0) {
+      allMeetings = allMeetings.concat(data.meetings);
+    }
+    nextPageToken = data.next_page_token || "";
+  } while (nextPageToken && allMeetings.length < 1000);
+
+  return allMeetings;
+}
+
+export async function listPastReportMeetings(
+  daysBack = 60
+): Promise<ZoomMeeting[]> {
+  const result: ZoomMeeting[] = [];
+  const now = new Date();
+
+  // Zoom /report/users/{userId}/meetings allows max 30-day range per call
+  // Split into 30-day chunks (e.g. 0-30 days ago, 30-60 days ago)
+  const chunks = Math.ceil(daysBack / 30);
+  for (let i = 0; i < chunks; i++) {
+    const endDays = i * 30;
+    const startDays = Math.min((i + 1) * 30 - 1, daysBack);
+
+    const toDate = new Date(now.getTime() - endDays * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const fromDate = new Date(now.getTime() - startDays * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
+    try {
+      const data = await zoomFetch<any>(
+        `/report/users/${encodeURIComponent(ZOOM_HOST_EMAIL)}/meetings?from=${fromDate}&to=${toDate}&page_size=300`
+      );
+      if (data?.meetings && Array.isArray(data.meetings)) {
+        for (const m of data.meetings) {
+          result.push({
+            id: m.id,
+            uuid: m.uuid,
+            topic: m.topic || `Rapat ${m.id}`,
+            type: m.type || 2,
+            start_time: m.start_time,
+            duration: m.duration || 60,
+            timezone: m.timezone || DEFAULT_TIMEZONE,
+            join_url: `https://zoom.us/j/${m.id}`,
+            status: "finished",
+          });
+        }
+      }
+    } catch {
+      // Ignore if user has no report scope
+    }
+  }
+
+  return result;
+}
+
+export async function listAllMeetings(): Promise<ZoomMeeting[]> {
+  const [upcoming, scheduled, live, previous, pastReports, savedLocal] =
+    await Promise.all([
+      listMeetings("upcoming").catch(() => []),
+      listMeetings("scheduled").catch(() => []),
+      listMeetings("live").catch(() => []),
+      listMeetings("previous_meetings").catch(() => []),
+      listPastReportMeetings(60).catch(() => []),
+      db.getSavedMeetings().catch(() => []),
+    ]);
+
+  const allItems: ZoomMeeting[] = [
+    ...live,
+    ...upcoming,
+    ...scheduled,
+    ...previous,
+    ...pastReports,
+    ...(savedLocal as ZoomMeeting[]),
+  ];
+
+  // Deduplicate by meeting id + start_time
+  const meetingMap = new Map<string, ZoomMeeting>();
+  for (const m of allItems) {
+    if (!m || !m.id) continue;
+    const key = `${m.id}_${m.start_time ? new Date(m.start_time).toISOString().slice(0, 16) : ""}`;
+    if (!meetingMap.has(key)) {
+      meetingMap.set(key, m);
+    } else {
+      // Merge properties if newer has more details
+      const existing = meetingMap.get(key)!;
+      meetingMap.set(key, {
+        ...existing,
+        ...m,
+        password: m.password || existing.password,
+        join_url: m.join_url || existing.join_url,
+        start_url: m.start_url || existing.start_url,
+      });
+    }
+  }
+
+  const merged = Array.from(meetingMap.values()).sort(
+    (a, b) =>
+      new Date(b.start_time || 0).getTime() - new Date(a.start_time || 0).getTime()
   );
-  return data.meetings ?? [];
+
+  // Cache to local DB asynchronously
+  if (merged.length > 0) {
+    db.saveMeetings(
+      merged.map((m) => ({
+        id: String(m.id),
+        zoomMeetingId: String(m.id),
+        uuid: m.uuid,
+        topic: m.topic,
+        startTime: m.start_time || new Date().toISOString(),
+        duration: m.duration,
+        timezone: m.timezone,
+        joinUrl: m.join_url,
+        startUrl: m.start_url,
+        passcode: m.password,
+      }))
+    ).catch(() => {});
+  }
+
+  return merged;
 }
 
 export async function getMeeting(meetingId: number | string): Promise<ZoomMeeting> {
@@ -229,6 +356,163 @@ export async function getPastMeetingParticipants(
     `/past_meetings/${meetingId}/participants?page_size=300`
   );
   return data.participants ?? [];
+}
+
+export async function getMeetingParticipantsLiveOrPast(
+  meetingId: number | string
+): Promise<
+  Array<{
+    id: string;
+    name: string;
+    email?: string;
+    join_time: string;
+    leave_time?: string;
+    duration: number;
+    role?: string;
+  }>
+> {
+  const cleanId = String(meetingId).trim();
+  const participantMap = new Map<
+    string,
+    {
+      id: string;
+      name: string;
+      email?: string;
+      join_time: string;
+      leave_time?: string;
+      duration: number;
+      role?: string;
+    }
+  >();
+
+  const addParticipant = (p: any, defaultRole = "participant") => {
+    if (!p) return;
+    const name = p.name || p.user_name || p.userName || "Peserta";
+    const email = p.email || p.user_email || p.userEmail || undefined;
+    const key = email ? email.toLowerCase() : `${name}_${p.join_time || ""}`;
+    if (!participantMap.has(key)) {
+      participantMap.set(key, {
+        id: String(p.id || p.user_id || p.participant_user_id || participantMap.size + 1),
+        name,
+        email,
+        join_time: p.join_time || p.joinTime || new Date().toISOString(),
+        leave_time: p.leave_time || p.leaveTime || undefined,
+        duration: Number(p.duration) || 0,
+        role: p.role || defaultRole,
+      });
+    }
+  };
+
+  // Run all strategies in parallel with Promise.allSettled
+  await Promise.allSettled([
+    // Strategy 1: Zoom Reports API
+    (async () => {
+      try {
+        const data = await zoomFetch<any>(
+          `/report/meetings/${cleanId}/participants?page_size=300`
+        );
+        if (data?.participants && Array.isArray(data.participants)) {
+          data.participants.forEach((p: any) => addParticipant(p));
+        }
+      } catch {}
+    })(),
+
+    // Strategy 2: Metrics API (live)
+    (async () => {
+      try {
+        const data = await zoomFetch<any>(
+          `/metrics/meetings/${cleanId}/participants?type=live&page_size=300`
+        );
+        if (data?.participants && Array.isArray(data.participants)) {
+          data.participants.forEach((p: any) => addParticipant(p));
+        }
+      } catch {}
+    })(),
+
+    // Strategy 3: Metrics API (past)
+    (async () => {
+      try {
+        const data = await zoomFetch<any>(
+          `/metrics/meetings/${cleanId}/participants?type=past&page_size=300`
+        );
+        if (data?.participants && Array.isArray(data.participants)) {
+          data.participants.forEach((p: any) => addParticipant(p));
+        }
+      } catch {}
+    })(),
+
+    // Strategy 4: Past meetings endpoint
+    (async () => {
+      try {
+        const data = await zoomFetch<any>(
+          `/past_meetings/${cleanId}/participants?page_size=300`
+        );
+        if (data?.participants && Array.isArray(data.participants)) {
+          data.participants.forEach((p: any) => addParticipant(p));
+        }
+      } catch {}
+    })(),
+
+    // Strategy 5: Meeting instances UUIDs
+    (async () => {
+      try {
+        const instances = await zoomFetch<any>(
+          `/past_meetings/${cleanId}/instances`
+        );
+        if (instances?.meetings && Array.isArray(instances.meetings)) {
+          for (const inst of instances.meetings.slice(0, 3)) {
+            if (inst.uuid) {
+              const encUuid = encodeURIComponent(encodeURIComponent(inst.uuid));
+              try {
+                const pData = await zoomFetch<any>(
+                  `/past_meetings/${encUuid}/participants?page_size=300`
+                );
+                if (pData?.participants) {
+                  pData.participants.forEach((p: any) => addParticipant(p));
+                }
+              } catch {}
+              try {
+                const rData = await zoomFetch<any>(
+                  `/report/meetings/${encUuid}/participants?page_size=300`
+                );
+                if (rData?.participants) {
+                  rData.participants.forEach((p: any) => addParticipant(p));
+                }
+              } catch {}
+            }
+          }
+        }
+      } catch {}
+    })(),
+
+    // Strategy 6: Local SQLite DB records
+    (async () => {
+      try {
+        const local = await db.getParticipants({ meetingId: cleanId });
+        if (local && Array.isArray(local)) {
+          local.forEach((p: any) => addParticipant(p));
+        }
+      } catch {}
+    })(),
+  ]);
+
+  const result = Array.from(participantMap.values());
+
+  // Cache to local DB asynchronously
+  if (result.length > 0) {
+    db.saveParticipants(
+      cleanId,
+      result.map((p) => ({
+        name: p.name,
+        email: p.email,
+        joinTime: p.join_time,
+        leaveTime: p.leave_time,
+        duration: p.duration,
+      }))
+    ).catch(() => {});
+  }
+
+  return result;
 }
 
 // ─── Cloud Recordings ─────────────────────────────────────────────────────────
@@ -306,16 +590,19 @@ export async function syncWithZoom(): Promise<{
   participantsSynced: number;
   recordingsSynced: number;
 }> {
-  const [upcomingMeetings, pastMeetings, recordings] = await Promise.all([
-    listMeetings("upcoming").catch(() => []),
-    listPastMeetings().catch(() => []),
+  const [allMeetings, recordings] = await Promise.all([
+    listAllMeetings().catch(() => []),
     listRecordings().catch(() => []),
   ]);
 
   let totalParticipants = 0;
 
-  // Sync past meeting participants
-  for (const past of pastMeetings.slice(0, 5)) {
+  // Sync past meeting participants for all finished/occurred meetings
+  const finishedMeetings = allMeetings.filter(
+    (m) => getPastMeetingStatus(m.start_time, m.duration) === "finished"
+  );
+
+  for (const past of finishedMeetings.slice(0, 25)) {
     try {
       const participants = await getPastMeetingParticipants(past.id);
       if (participants.length > 0) {
@@ -362,14 +649,21 @@ export async function syncWithZoom(): Promise<{
   await db.logActivity({
     action: "Sync with Zoom",
     entity: "System",
-    description: `Sinkronisasi data berhasil: ${upcomingMeetings.length + pastMeetings.length} rapat, ${totalParticipants} peserta, ${recordings.length} rekaman`,
+    description: `Sinkronisasi data berhasil: ${allMeetings.length} rapat, ${totalParticipants} peserta, ${recordings.length} rekaman`,
   });
 
   return {
-    meetingsSynced: upcomingMeetings.length + pastMeetings.length,
+    meetingsSynced: allMeetings.length,
     participantsSynced: totalParticipants,
     recordingsSynced: recordings.length,
   };
+}
+
+function getPastMeetingStatus(startTime?: string, duration = 60): string {
+  if (!startTime) return "finished";
+  const start = new Date(startTime);
+  const end = new Date(start.getTime() + duration * 60 * 1000);
+  return new Date() > end ? "finished" : "upcoming";
 }
 
 // ─── Webhook Validation ───────────────────────────────────────────────────────

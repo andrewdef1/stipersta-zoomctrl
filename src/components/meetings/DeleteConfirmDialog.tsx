@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { deleteMeetingAction } from "@/app/actions/zoom";
 import { Trash2, X, AlertTriangle, Loader2 } from "lucide-react";
@@ -20,9 +21,28 @@ export function DeleteConfirmDialog({
   className,
 }: DeleteConfirmDialogProps) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const originalStyle = window.getComputedStyle(document.body).overflow;
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !isPending) setOpen(false);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = originalStyle;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open, isPending]);
 
   function handleDelete() {
     setError("");
@@ -51,16 +71,16 @@ export function DeleteConfirmDialog({
         Hapus Rapat
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {open && mounted && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
           {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
             onClick={() => !isPending && setOpen(false)}
           />
 
           {/* Dialog */}
-          <div className="relative z-10 w-full max-w-md rounded-2xl glass shadow-2xl shadow-black/40 p-6">
+          <div className="relative z-10 w-full max-w-md rounded-2xl bg-zinc-900 border border-zinc-700/80 shadow-2xl shadow-black p-6 animate-in fade-in zoom-in-95 duration-150">
             <button
               onClick={() => setOpen(false)}
               disabled={isPending}
@@ -116,7 +136,8 @@ export function DeleteConfirmDialog({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

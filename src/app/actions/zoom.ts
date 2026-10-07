@@ -2,6 +2,7 @@
 
 import {
   listMeetings,
+  listAllMeetings,
   getMeeting,
   createMeeting,
   updateMeeting,
@@ -9,6 +10,7 @@ import {
   listPastMeetings,
   getPastMeetingDetails,
   getPastMeetingParticipants,
+  getMeetingParticipantsLiveOrPast,
   getHostUser,
   listUsers,
   listRecordings,
@@ -98,6 +100,30 @@ export async function getZoomAccountStatusAction(): Promise<
 
 // ─── Meeting Read Actions ─────────────────────────────────────────────────────
 
+export async function getAllMeetingsAction(): Promise<
+  ActionResult<MeetingWithStatus[]>
+> {
+  try {
+    await requireAuth();
+    if (!isZoomConfigured()) {
+      const saved = await db.getSavedMeetings();
+      const enriched = saved.map((m) => ({
+        ...m,
+        computed_status: getMeetingStatus(m.start_time, m.duration),
+      }));
+      return { success: true, data: enriched as MeetingWithStatus[] };
+    }
+    const meetings = await listAllMeetings();
+    const enriched = meetings.map((m) => ({
+      ...m,
+      computed_status: getMeetingStatus(m.start_time, m.duration),
+    }));
+    return { success: true, data: enriched };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+}
+
 export async function getUpcomingMeetingsAction(): Promise<
   ActionResult<MeetingWithStatus[]>
 > {
@@ -120,20 +146,7 @@ export async function getUpcomingMeetingsAction(): Promise<
 export async function getScheduledMeetingsAction(): Promise<
   ActionResult<MeetingWithStatus[]>
 > {
-  try {
-    await requireAuth();
-    if (!isZoomConfigured()) {
-      return { success: true, data: [] };
-    }
-    const meetings = await listMeetings("scheduled");
-    const enriched = meetings.map((m) => ({
-      ...m,
-      computed_status: getMeetingStatus(m.start_time, m.duration),
-    }));
-    return { success: true, data: enriched };
-  } catch (e) {
-    return { success: false, error: (e as Error).message };
-  }
+  return getAllMeetingsAction();
 }
 
 export async function getTodayMeetingsAction(): Promise<
@@ -144,8 +157,8 @@ export async function getTodayMeetingsAction(): Promise<
     if (!isZoomConfigured()) {
       return { success: true, data: [] };
     }
-    const meetings = await listMeetings("upcoming");
-    const today = meetings
+    const allMeetings = await listAllMeetings();
+    const today = allMeetings
       .filter((m) => isMeetingToday(m.start_time))
       .map((m) => ({
         ...m,
@@ -203,6 +216,191 @@ export async function getPastMeetingParticipantsAction(
     await requireAuth();
     const participants = await getPastMeetingParticipants(meetingId);
     return { success: true, data: participants };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+}
+
+export interface MeetingParticipantWithCoHost {
+  id: string;
+  name: string;
+  email?: string;
+  join_time: string;
+  leave_time?: string;
+  duration: number;
+  role?: string;
+  isCoHost: boolean;
+}
+
+export async function getMeetingParticipantsWithCoHostAction(
+  meetingId: number | string
+): Promise<ActionResult<{
+  participants: MeetingParticipantWithCoHost[];
+  coHosts: string[];
+}>> {
+  try {
+    await requireAuth();
+    const meeting = await getMeeting(meetingId);
+    const hostEmail = (meeting.host_email || ZOOM_HOST_EMAIL || "").toLowerCase();
+    const coHosts = (meeting.settings?.alternative_hosts || "")
+      .split(/[,;]/)
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+
+    const rawParticipants = await getMeetingParticipantsLiveOrPast(meetingId);
+
+    const participants: MeetingParticipantWithCoHost[] = rawParticipants.map((p) => {
+      const emailLower = (p.email || "").toLowerCase();
+      const isCoHost = emailLower ? coHosts.includes(emailLower) : false;
+      return {
+        ...p,
+        isCoHost,
+      };
+    });
+
+    // If host is not present in raw list, add Host as active meeting host
+    const hasHost = participants.some(
+      (p) => p.email && p.email.toLowerCase() === hostEmail
+    );
+    if (!hasHost && hostEmail) {
+      participants.unshift({
+        id: `host_${meeting.id}`,
+        name: "Administrator STIPER STA (Host)",
+        email: hostEmail,
+        join_time: meeting.start_time || new Date().toISOString(),
+        duration: meeting.duration || 60,
+        role: "host",
+        isCoHost: false,
+      });
+    }
+
+    return {
+      success: true,
+      data: {
+        participants,
+        coHosts,
+      },
+    };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+}
+
+export async function recordParticipantAction(
+  meetingId: number | string,
+  name: string,
+  email?: string
+): Promise<ActionResult<void>> {
+  try {
+    await requireAuth();
+    const cleanName = name.trim();
+    if (!cleanName) return { success: false, error: "Nama peserta wajib diisi." };
+
+    await db.saveParticipants(String(meetingId), [
+      {
+        name: cleanName,
+        email: email?.trim() || undefined,
+        joinTime: new Date().toISOString(),
+        duration: 0,
+        status: "Present",
+      },
+    ]);
+
+    revalidatePath(`/meetings/${meetingId}`);
+    return { success: true, data: undefined };
+  } catch (e) {
+    return { success: false, error: (e as Error).message };
+  }
+}
+
+export async function addCoHostAction(
+  meetingId: number | string,
+  email: string
+): Promise<ActionResult<{ alternative_hosts: string }>> {
+  try {
+    const session = await requireAuth();
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      return { success: false, error: "Format email tidak valid." };
+    }
+
+    const meeting = await getMeeting(meetingId);
+    const existingCoHosts = (meeting.settings?.alternative_hosts || "")
+      .split(/[,;]/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+
+    if (!existingCoHosts.map((e) => e.toLowerCase()).includes(cleanEmail)) {
+      existingCoHosts.push(cleanEmail);
+    }
+
+    const updatedList = existingCoHosts.join(",");
+
+    await updateMeeting(meetingId, {
+      settings: {
+        ...meeting.settings,
+        alternative_hosts: updatedList,
+        alternative_hosts_email_notification: true,
+      },
+    });
+
+    await db.logActivity({
+      userId: session.user?.id,
+      userEmail: session.user?.email || undefined,
+      action: "Assign Co-Host",
+      entity: "Meeting",
+      entityId: String(meetingId),
+      description: `Menjadikan ${cleanEmail} sebagai Co-Host untuk rapat "${meeting.topic}" (#${meetingId})`,
+    });
+
+    revalidatePath(`/meetings/${meetingId}`);
+    return { success: true, data: { alternative_hosts: updatedList } };
+  } catch (e: any) {
+    const msg = e?.message || "";
+    if (msg.includes("cannot be selected at this time") || msg.includes("400")) {
+      return {
+        success: false,
+        error: `Email "${email}" tidak dapat dijadikan Co-Host karena bukan merupakan akun pengguna yang terdaftar di dalam organisasi Zoom institusi STIPER STA (${ZOOM_HOST_EMAIL}). Kebijakan Zoom API mewajibkan Alternative Host merupakan anggota di akun Zoom organisasi yang sama.`,
+      };
+    }
+    return { success: false, error: msg || "Gagal menambahkan Co-Host di server Zoom." };
+  }
+}
+
+export async function removeCoHostAction(
+  meetingId: number | string,
+  email: string
+): Promise<ActionResult<{ alternative_hosts: string }>> {
+  try {
+    const session = await requireAuth();
+    const cleanEmail = email.trim().toLowerCase();
+    const meeting = await getMeeting(meetingId);
+    const existingCoHosts = (meeting.settings?.alternative_hosts || "")
+      .split(/[,;]/)
+      .map((e) => e.trim())
+      .filter(Boolean);
+
+    const updated = existingCoHosts.filter((e) => e.toLowerCase() !== cleanEmail);
+    const updatedList = updated.join(",");
+
+    await updateMeeting(meetingId, {
+      settings: {
+        ...meeting.settings,
+        alternative_hosts: updatedList,
+      },
+    });
+
+    await db.logActivity({
+      userId: session.user?.id,
+      userEmail: session.user?.email || undefined,
+      action: "Remove Co-Host",
+      entity: "Meeting",
+      entityId: String(meetingId),
+      description: `Menghapus status Co-Host dari ${cleanEmail} pada rapat "${meeting.topic}" (#${meetingId})`,
+    });
+
+    revalidatePath(`/meetings/${meetingId}`);
+    return { success: true, data: { alternative_hosts: updatedList } };
   } catch (e) {
     return { success: false, error: (e as Error).message };
   }

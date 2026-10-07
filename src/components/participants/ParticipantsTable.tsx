@@ -123,8 +123,8 @@ export function ParticipantsTable({ participants }: Props) {
                   </td>
                 </tr>
               ) : (
-                filtered.map((p) => (
-                  <tr key={p.id} className="hover:bg-white/[0.02] transition-colors">
+                filtered.map((p, idx) => (
+                  <tr key={`${p.id}_${idx}`} className="hover:bg-white/[0.02] transition-colors">
                     <td className="px-5 py-3.5 font-medium text-white flex items-center gap-2">
                       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/10 text-blue-400 font-bold text-xs">
                         {p.name.charAt(0).toUpperCase()}

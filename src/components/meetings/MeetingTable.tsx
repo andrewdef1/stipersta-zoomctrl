@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { ZoomMeeting } from "@/types/zoom";
 import { getMeetingStatus, formatDateTime, formatDuration, truncate } from "@/lib/utils";
 import { MeetingStatusBadge } from "./MeetingStatusBadge";
+import { EditMeetingButton } from "./EditMeetingButton";
 import {
   Search,
   ChevronRight,
@@ -31,7 +32,7 @@ export function MeetingTable({ meetings }: MeetingTableProps) {
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
   const filtered = useMemo(() => {
-    return meetings.filter((m) => {
+    const list = meetings.filter((m) => {
       const status = getMeetingStatus(m.start_time, m.duration);
       const matchesStatus =
         filterStatus === "all" || status === filterStatus;
@@ -40,6 +41,43 @@ export function MeetingTable({ meetings }: MeetingTableProps) {
         m.topic.toLowerCase().includes(search.toLowerCase()) ||
         String(m.id).includes(search);
       return matchesStatus && matchesSearch;
+    });
+
+    return list.sort((a, b) => {
+      const statusA = getMeetingStatus(a.start_time, a.duration);
+      const statusB = getMeetingStatus(b.start_time, b.duration);
+      const timeA = new Date(a.start_time).getTime();
+      const timeB = new Date(b.start_time).getTime();
+
+      if (filterStatus === "upcoming") {
+        return timeA - timeB; // Rapat terdekat/paling segera di atas
+      }
+      if (filterStatus === "finished") {
+        return timeB - timeA; // Rapat yang baru saja selesai di atas
+      }
+      if (filterStatus === "live") {
+        return timeA - timeB;
+      }
+
+      // Default filter "all": Live (0) -> Upcoming terdekat (1) -> Selesai terbaru (2)
+      const priority = (s: "live" | "upcoming" | "finished") => {
+        if (s === "live") return 0;
+        if (s === "upcoming") return 1;
+        return 2;
+      };
+
+      const pA = priority(statusA);
+      const pB = priority(statusB);
+
+      if (pA !== pB) {
+        return pA - pB;
+      }
+
+      if (statusA === "upcoming" || statusA === "live") {
+        return timeA - timeB; // Rapat yang jamnya paling dekat dimulai berada paling atas
+      }
+
+      return timeB - timeA;
     });
   }, [meetings, search, filterStatus]);
 
@@ -110,11 +148,11 @@ export function MeetingTable({ meetings }: MeetingTableProps) {
                   </td>
                 </tr>
               ) : (
-                paginated.map((meeting) => {
+                paginated.map((meeting, idx) => {
                   const status = getMeetingStatus(meeting.start_time, meeting.duration);
                   return (
                     <tr
-                      key={meeting.id}
+                      key={`${meeting.uuid || meeting.id}_${meeting.start_time || idx}`}
                       className="group hover:bg-white/[0.02] transition-colors"
                     >
                       <td className="px-5 py-4">
@@ -148,7 +186,7 @@ export function MeetingTable({ meetings }: MeetingTableProps) {
                         <MeetingStatusBadge status={status} />
                       </td>
                       <td className="px-5 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <Link
                             href={`/meetings/${meeting.id}`}
                             className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors"
@@ -156,11 +194,13 @@ export function MeetingTable({ meetings }: MeetingTableProps) {
                             Detail
                             <ChevronRight className="h-3 w-3" />
                           </Link>
+                          <EditMeetingButton meeting={meeting} size="sm" />
                           <a
                             href={meeting.join_url}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-zinc-500 hover:bg-white/10 hover:text-zinc-300 transition-colors"
+                            title="Buka Link Rapat"
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
                           </a>
